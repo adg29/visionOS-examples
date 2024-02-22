@@ -12,15 +12,21 @@ import RealityKitContent
 struct ContentView: View {
     
     @State private var userInput: String = ""
-    
+    @StateObject var speechRecognizer = SpeechRecognizer()
+    @State private var isRecording = false
     //API Response will be rendered here
     @State private var apiResponse: String = ""
     
     private var openAiApiKey: String = Secrets.OPENAI_API_KEY // Replace this with your actual OpenAI API key
-    
+
     var body: some View {
         VStack {
-            
+            Toggle(isOn: $isRecording) {
+                Text(isRecording ? "Stop Recognition" : "Start Recognition")
+            }
+            .toggleStyle(RecordToggleStyle())
+            .padding()
+
             SearchBar(text: $userInput, onSearchButtonClicked: {
                 sendToOpenAI(input: userInput)
             })
@@ -31,6 +37,25 @@ struct ContentView: View {
             }
         }
         .padding(.top)
+        .onChange(of: isRecording) { newValue in
+            if newValue {
+                startRecognition()
+            } else {
+                endRecognition()
+            }
+        }
+    }
+    
+    private func startRecognition() {
+        speechRecognizer.resetTranscript()
+        speechRecognizer.startTranscribing()
+        isRecording = true
+    }
+
+    private func endRecognition() {
+        speechRecognizer.stopTranscribing()
+        isRecording = false
+        sendToOpenAI(input: speechRecognizer.transcript)
     }
     
     func sendToOpenAI(input: String) {
@@ -97,6 +122,20 @@ struct ContentView: View {
             }
         }
         task.resume()
+    }
+    
+    
+    struct RecordToggleStyle: ToggleStyle {
+        func makeBody(configuration: Configuration) -> some View {
+            Button {
+                configuration.isOn.toggle()
+            } label: {
+                HStack {
+                    Image(systemName: configuration.isOn ? "waveform.circle.fill" : "waveform.circle")
+                    configuration.label
+                }
+            }
+        }
     }
     
     struct OpenAIResponse: Codable {
